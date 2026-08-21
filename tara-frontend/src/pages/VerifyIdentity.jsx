@@ -232,10 +232,30 @@ export default function VerifyIdentity() {
                     )}
                   </div>
 
+                  <div className="flex items-start gap-4 mb-3.5">
+                    {summary.photoDataUrl ? (
+                      <img
+                        src={summary.photoDataUrl}
+                        alt={summary.fullName ? `Photo of ${summary.fullName} from QoreID` : 'Verified identity photo from QoreID'}
+                        className="w-16 h-16 rounded-xl object-cover border border-[#E8E5E0] shrink-0 bg-white"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-[#0D9488]/10 border border-[#0D9488]/20 flex items-center justify-center shrink-0">
+                        <span className="text-lg font-bold text-[#0D9488]">
+                          {(summary.fullName ?? '?').trim().charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="min-w-0 pt-1">
+                      <p className="text-base font-semibold text-[#1B1A17] truncate">{summary.fullName ?? 'Name unavailable'}</p>
+                      <p className="text-xs text-[#8A8580] mt-0.5">
+                        {[summary.idType, summary.idNumber].filter(Boolean).join(' · ') || 'ID details unavailable'}
+                      </p>
+                    </div>
+                  </div>
+
                   <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                    <SummaryRow label="Full Name" value={summary.fullName} />
-                    <SummaryRow label="ID Type" value={summary.idType} />
-                    <SummaryRow label="ID Number" value={summary.idNumber} mono />
                     <SummaryRow label="Phone" value={summary.phone} />
                     <SummaryRow label="Gender" value={summary.gender} />
                     <SummaryRow label="Date of Birth" value={summary.dob} />

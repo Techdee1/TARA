@@ -61,12 +61,31 @@ export function normalizeQoreIdResponse(raw) {
       dob: d.dateOfBirth ?? null,
       confidence: typeof raw.confidence === 'number' ? raw.confidence : null,
       fieldMatches: null,
+      photoDataUrl: toPhotoDataUrl(d),
       isFallback: !!raw.fallback || raw.provider === 'qoreid_stub_offline',
       fallbackReason: raw.fallback_reason ?? null,
       source: raw.provider ?? 'stub',
     }
   }
 
+  return null
+}
+
+// QoreID (and providers like it) name the base64 photo field differently
+// depending on the check — try every field name it's known to use, and
+// return a ready-to-render `data:` URL. The raw value can arrive either
+// bare (just the base64 payload) or already wrapped in a data URL — this
+// normalizes to the latter either way, and returns null rather than a
+// broken <img> if nothing usable is present.
+const PHOTO_FIELDS = ['photo', 'photoBase64', 'image', 'img', 'picture', 'passportPhoto', 'photograph', 'base64Image']
+
+function toPhotoDataUrl(record) {
+  if (!record) return null
+  for (const field of PHOTO_FIELDS) {
+    const value = record[field]
+    if (typeof value !== 'string' || value.length < 100) continue // too short to be real image data
+    return value.startsWith('data:') ? value : `data:image/jpeg;base64,${value}`
+  }
   return null
 }
 
