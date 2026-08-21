@@ -9,7 +9,8 @@ import { formatNaira } from '@/utils/formatters'
 import { useAmountsStore } from '@/store/amountsStore'
 import { taraAudio } from '@/lib/taraAudio'
 import { normalizeQoreIdResponse } from '@/utils/qoreid'
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { generateSessionContext } from '@/utils/sessionContext'
+import { CheckIcon, XMarkIcon, DevicePhoneMobileIcon, BriefcaseIcon, MapPinIcon, BanknotesIcon } from '@heroicons/react/24/outline'
 
 function SummaryRow({ label, value, mono }) {
   if (!value) return null
@@ -21,14 +22,21 @@ function SummaryRow({ label, value, mono }) {
   )
 }
 
-const EMPTY_FORM = {
-  full_name: '',
-  id_number: '',
-  device_id: '',
-  address: '',
-  employer: '',
-  requested_amount_ngn: '',
+function ContextChip({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white border border-[#E8E5E0]">
+      <div className="w-7 h-7 rounded-md bg-[#F0EEEA] flex items-center justify-center shrink-0">
+        <Icon className="w-3.5 h-3.5 text-[#6B6660]" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[9px] text-[#8A8580] uppercase tracking-wider">{label}</p>
+        <p className="text-xs text-[#1B1A17] font-medium truncate">{value ?? '—'}</p>
+      </div>
+    </div>
+  )
 }
+
+const EMPTY_FORM = { full_name: '', id_number: '' }
 
 // NIN and BVN are both 11-digit Nigerian identifiers, so the same shape
 // check covers either — the ID type toggle only changes which field name
@@ -56,6 +64,7 @@ export default function VerifyIdentity() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
   const [result, setResult] = useState(null)
+  const [sessionContext, setSessionContext] = useState(null)
   const [showRaw, setShowRaw] = useState(false)
   const verifyMutation = useVerifyIdentity()
   const setAmount = useAmountsStore((s) => s.setAmount)
@@ -72,20 +81,25 @@ export default function VerifyIdentity() {
 
     const { first_name, last_name } = splitName(form.full_name)
     const idNumber = form.id_number.trim()
+    // Everything below is what a real onboarding flow would already have —
+    // a device fingerprint, an address/employer already on file, a loan
+    // amount from the application — not something a person types by hand
+    // when all they're doing is confirming a name and an ID number.
+    const context = generateSessionContext()
     try {
       const data = await verifyMutation.mutateAsync({
         [idType]: idNumber,
         first_name,
         last_name,
-        device_id: form.device_id.trim() || undefined,
-        address: form.address.trim() || undefined,
-        employer: form.employer.trim() || undefined,
-        requested_amount_ngn: form.requested_amount_ngn.trim() || undefined,
+        device_id: context.device_id,
+        address: context.address,
+        employer: context.employer ?? undefined,
+        requested_amount_ngn: context.requested_amount_ngn ?? undefined,
       })
       setResult(data)
-      const amountValue = form.requested_amount_ngn.trim()
-      if (data.status === 'verified' && amountValue && !Number.isNaN(Number(amountValue))) {
-        setAmount(data.identity_id, Number(amountValue))
+      setSessionContext(context)
+      if (data.status === 'verified' && context.requested_amount_ngn != null) {
+        setAmount(data.identity_id, context.requested_amount_ngn)
       }
       if (data.status === 'verified') {
         taraAudio.playPop() // the identity landing in the graph
@@ -96,6 +110,7 @@ export default function VerifyIdentity() {
     } catch (err) {
       const detail = err?.response?.data?.detail
       setResult({ status: 'error', reason: typeof detail === 'string' ? detail : 'Verification request failed' })
+      setSessionContext(null)
       taraAudio.playAlert()
     }
   }
@@ -104,6 +119,7 @@ export default function VerifyIdentity() {
     setForm(EMPTY_FORM)
     setErrors({})
     setResult(null)
+    setSessionContext(null)
   }
 
   return (
@@ -162,42 +178,10 @@ export default function VerifyIdentity() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Device ID"
-              placeholder="e.g. DEV-9F31A"
-              value={form.device_id}
-              onChange={set('device_id')}
-              disabled={verifyMutation.isPending}
-            />
-            <Input
-              label="Employer"
-              placeholder="e.g. Zenta Logistics Ltd"
-              value={form.employer}
-              onChange={set('employer')}
-              disabled={verifyMutation.isPending}
-            />
-          </div>
-          <Input
-            label="Address"
-            placeholder="e.g. 14 Allen Ave, Ikeja"
-            value={form.address}
-            onChange={set('address')}
-            disabled={verifyMutation.isPending}
-          />
-          <div>
-            <Input
-              label="Requested Amount (₦) · optional"
-              placeholder="e.g. 350000"
-              value={form.requested_amount_ngn}
-              onChange={set('requested_amount_ngn')}
-              disabled={verifyMutation.isPending}
-              inputMode="numeric"
-            />
-            <p className="text-[11px] text-[#8A8580] mt-1.5">
-              A loan, wallet top-up, or listing value — shown on the verdict so a reviewer sees what's at stake, not used in detection.
-            </p>
-          </div>
+          <p className="text-[11px] text-[#8A8580] leading-relaxed">
+            Device, address, employer, and requested amount are captured from the session automatically —
+            just like a real onboarding flow — and shown on the result below.
+          </p>
 
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="ghost" onClick={handleReset} disabled={verifyMutation.isPending}>
@@ -224,7 +208,7 @@ export default function VerifyIdentity() {
               {summary && (
                 <div className="rounded-xl border border-[#E8E5E0] bg-[#F8F7F5] p-4">
                   <div className="flex items-center justify-between mb-3.5">
-                    <p className="text-xs uppercase tracking-wider font-semibold text-[#8A8580]">Verification Summary</p>
+                    <p className="text-xs uppercase tracking-wider font-semibold text-[#8A8580]">Identity Profile</p>
                     {summary.matchLabel && (
                       <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#0D9488]/10 text-[#0D9488]">
                         {summary.matchLabel}
@@ -232,7 +216,7 @@ export default function VerifyIdentity() {
                     )}
                   </div>
 
-                  <div className="flex items-start gap-4 mb-3.5">
+                  <div className="flex items-start gap-4 mb-4">
                     {summary.photoDataUrl ? (
                       <img
                         src={summary.photoDataUrl}
@@ -255,7 +239,7 @@ export default function VerifyIdentity() {
                     </div>
                   </div>
 
-                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 mb-1">
                     <SummaryRow label="Phone" value={summary.phone} />
                     <SummaryRow label="Gender" value={summary.gender} />
                     <SummaryRow label="Date of Birth" value={summary.dob} />
@@ -265,7 +249,7 @@ export default function VerifyIdentity() {
                   </dl>
 
                   {summary.fieldMatches && summary.fieldMatches.length > 0 && (
-                    <div className="mt-3.5 pt-3.5 border-t border-[#E8E5E0] flex flex-wrap gap-1.5">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                       {summary.fieldMatches.map(({ field, matched }) => (
                         <span
                           key={field}
@@ -280,6 +264,24 @@ export default function VerifyIdentity() {
                     </div>
                   )}
 
+                  {sessionContext && (
+                    <div className="mt-4 pt-4 border-t border-[#E8E5E0]">
+                      <p className="text-xs uppercase tracking-wider font-semibold text-[#8A8580] mb-2.5">
+                        This Interaction
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <ContextChip icon={DevicePhoneMobileIcon} label="Device" value={sessionContext.device_id} />
+                        <ContextChip icon={BriefcaseIcon} label="Employer" value={sessionContext.employer} />
+                        <ContextChip icon={MapPinIcon} label="Address" value={sessionContext.address} />
+                        <ContextChip
+                          icon={BanknotesIcon}
+                          label="Requested Amount"
+                          value={sessionContext.requested_amount_ngn != null ? formatNaira(sessionContext.requested_amount_ngn) : null}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {summary.isFallback && (
                     <p className="mt-3.5 pt-3.5 border-t border-[#E8E5E0] text-[11px] text-amber-700 leading-relaxed">
                       This used TARA&apos;s offline verification stub, not a live QoreID lookup
@@ -287,12 +289,6 @@ export default function VerifyIdentity() {
                     </p>
                   )}
                 </div>
-              )}
-
-              {form.requested_amount_ngn.trim() && !Number.isNaN(Number(form.requested_amount_ngn)) && (
-                <p className="text-sm text-[#6B6660]">
-                  Requested amount on file: <span className="text-[#1B1A17] font-medium">{formatNaira(Number(form.requested_amount_ngn))}</span>
-                </p>
               )}
 
               <div>
