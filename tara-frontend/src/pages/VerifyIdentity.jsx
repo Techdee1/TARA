@@ -283,10 +283,14 @@ export default function VerifyIdentity() {
                   )}
 
                   {summary.isFallback && (
-                    <p className="mt-3.5 pt-3.5 border-t border-[#E8E5E0] text-[11px] text-amber-700 leading-relaxed">
-                      This used TARA&apos;s offline verification stub, not a live QoreID lookup
-                      {summary.fallbackReason ? ` — ${summary.fallbackReason}` : '.'}
-                    </p>
+                    <div className="mt-3.5 pt-3.5 border-t border-[#E8E5E0]">
+                      <p className="text-[11px] text-amber-700 leading-relaxed">
+                        {summary.fallbackReasonFriendly ?? "This used TARA's offline verification stub, not a live QoreID lookup."}
+                      </p>
+                      {summary.fallbackReason && (
+                        <p className="text-[10px] text-[#8A8580] font-mono mt-1 break-all">{summary.fallbackReason}</p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

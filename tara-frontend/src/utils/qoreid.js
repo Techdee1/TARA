@@ -64,11 +64,38 @@ export function normalizeQoreIdResponse(raw) {
       photoDataUrl: toPhotoDataUrl(d),
       isFallback: !!raw.fallback || raw.provider === 'qoreid_stub_offline',
       fallbackReason: raw.fallback_reason ?? null,
+      fallbackReasonFriendly: raw.fallback_reason
+        ? friendlyFallbackReason(raw.fallback_reason, d.idType)
+        : null,
       source: raw.provider ?? 'stub',
     }
   }
 
   return null
+}
+
+// The backend passes through whatever error message its outbound QoreID
+// call failed with — useful for someone debugging the integration, but a
+// raw "Client error '404 Not Found' for url '...'" means nothing to a
+// reviewer who just wants to know why this identity looks unverified.
+// Translates the handful of failure modes actually seen in practice into
+// one plain sentence; anything unrecognized falls back to a generic line
+// rather than guessing.
+function friendlyFallbackReason(reason, idType) {
+  const idLabel = idType ? idType.toUpperCase() : 'ID number'
+  if (/404/.test(reason)) {
+    return `QoreID has no record under this ${idLabel} — worth double-checking the number and that the right ID type (BVN vs NIN) was selected.`
+  }
+  if (/401|403|unauthorized|forbidden/i.test(reason)) {
+    return "QoreID rejected TARA's credentials for this request — an API key or account access issue on the backend, not something wrong with this identity."
+  }
+  if (/timeout|timed out/i.test(reason)) {
+    return "QoreID didn't respond in time, so TARA fell back to a stub result."
+  }
+  if (/protocol|url/i.test(reason)) {
+    return "TARA's connection to QoreID is misconfigured on the backend — an infrastructure issue, not something wrong with this identity."
+  }
+  return "QoreID's live check didn't complete, so TARA used a stub result instead."
 }
 
 // QoreID (and providers like it) name the base64 photo field differently

@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useVerdict } from '@/hooks/useIdentities'
 import { useGraph } from '@/hooks/useGraph'
 import { verdictLabel, verdictToRiskLevel } from '@/utils/verdict'
 import { riskTextColor, riskBorderColor } from '@/utils/riskColors'
-import { formatNaira } from '@/utils/formatters'
+import { formatNaira, formatDateTime } from '@/utils/formatters'
 import { useAmountsStore } from '@/store/amountsStore'
+import { useDecisionsStore } from '@/store/decisionsStore'
+import { useAuthStore } from '@/store/authStore'
 import { taraAudio } from '@/lib/taraAudio'
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 const VERDICT_MEANING = {
   APPROVE: 'No shared-attribute, fragmentation, or coordinated-onboarding signal fired for this identity. It looks independent — nothing further is needed.',
@@ -22,10 +26,20 @@ export default function VerdictDetail() {
   const { data: verdict, isLoading, isError, error } = useVerdict(id)
   const { data: graphData } = useGraph()
   const localAmount = useAmountsStore((s) => s.amounts[id])
+  const decision = useDecisionsStore((s) => s.decisions[id])
+  const setDecision = useDecisionsStore((s) => s.setDecision)
+  const clearDecision = useDecisionsStore((s) => s.clearDecision)
+  const reviewerName = useAuthStore((s) => s.user?.name) ?? 'Reviewer'
 
   const identityNode = graphData?.nodes?.find((n) => n.id === id)
   const identityLabel = identityNode?.label ?? id
   const requestedAmount = identityNode?.requested_amount_ngn ?? localAmount ?? null
+
+  const decide = (outcome) => {
+    setDecision(id, outcome, reviewerName)
+    if (outcome === 'approved') taraAudio.playVerifiedTick()
+    else taraAudio.playVerdictStamp()
+  }
 
   // Plays once per verdict, not on every re-render (React Query can
   // refetch this in the background) — a flagged identity gets the full
@@ -86,7 +100,7 @@ export default function VerdictDetail() {
         <p className="text-6xl font-bold font-mono" style={{ color }}>
           {Math.round(verdict.trust_score * 100)}%
         </p>
-        <p className="text-xs text-[#8A8580] mt-2 uppercase tracking-wider">Trust Score</p>
+        <p className="text-xs text-[#8A8580] mt-2 uppercase tracking-wider">Risk Score</p>
         {requestedAmount != null && (
           <p className="text-sm text-[#6B6660] mt-4 pt-4 border-t border-[#E8E5E0]">
             Requested amount on file: <span className="text-[#1B1A17] font-semibold">{formatNaira(requestedAmount)}</span>
@@ -104,7 +118,11 @@ export default function VerdictDetail() {
           <p className="text-base text-[#6B6660] leading-relaxed">{verdict.explanation}</p>
         ) : (
           <ul className="space-y-3">
-            {verdict.evidence.map((point, i) => (
+            {/* Two identities can each independently pair against several
+                others in the same cluster, producing the same evidence
+                sentence more than once — dedupe so a reviewer doesn't read
+                the same line four times in a row. */}
+            {[...new Set(verdict.evidence)].map((point, i) => (
               <li key={i} className="flex items-start gap-3 text-lg text-[#1B1A17] leading-snug">
                 <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                 <span>{point}</span>
@@ -113,6 +131,50 @@ export default function VerdictDetail() {
           </ul>
         )}
       </Card>
+
+      {verdict.verdict !== 'APPROVE' && (
+        <Card className="p-5">
+          <p className="text-xs text-[#8A8580] uppercase tracking-wider font-medium mb-3">Reviewer Decision</p>
+          {decision ? (
+            <div className={`flex flex-wrap items-center gap-3 p-3 rounded-lg border ${
+              decision.decision === 'approved'
+                ? 'bg-green-500/10 border-green-500/30'
+                : 'bg-red-500/10 border-red-500/30'
+            }`}>
+              {decision.decision === 'approved' ? (
+                <CheckIcon className="w-4 h-4 text-green-600 shrink-0" />
+              ) : (
+                <XMarkIcon className="w-4 h-4 text-red-600 shrink-0" />
+              )}
+              <p className={`text-sm font-medium ${decision.decision === 'approved' ? 'text-green-700' : 'text-red-700'}`}>
+                {decision.decision === 'approved' ? 'Approved' : 'Rejected'} by {decision.reviewer}
+              </p>
+              <p className="text-xs text-[#8A8580] sm:ml-auto">{formatDateTime(decision.decidedAt)}</p>
+              <button
+                onClick={() => clearDecision(id)}
+                className="text-xs text-[#8A8580] hover:text-[#0D9488] underline transition-colors w-full sm:w-auto"
+              >
+                Change decision
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-[#6B6660] leading-relaxed mb-4">
+                Review the evidence above, then record the call. Nothing here is decided automatically —
+                this identity stays flagged until a person makes this choice.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" onClick={() => decide('approved')} className="bg-green-600 hover:bg-green-700">
+                  <CheckIcon className="w-4 h-4" /> Approve
+                </Button>
+                <Button variant="danger" onClick={() => decide('rejected')}>
+                  <XMarkIcon className="w-4 h-4" /> Reject
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
