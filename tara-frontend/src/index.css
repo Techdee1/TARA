@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #F5F4F1;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-elevated: #F0EEEA;
+  --color-bg-border: #E8E5E0;
+  --color-bg-inverse: #171613;
+  --color-accent: #0D9488;
+  --color-accent-dim: #0D948822;
+  --color-text-primary: #1B1A17;
+  --color-text-secondary: #6B6660;
+  --color-text-muted: #8A8580;
+  --color-risk-high: #EF4444;
+  --color-risk-medium: #F59E0B;
+  --color-risk-low: #22C55E;
+  --color-risk-none: #3B82F6;
+  /* Brand accent */
+  --color-brand-from: #FF4C1D;
+  --color-brand-to: #9B0063;
+  --font-family-sans: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+  --font-family-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  body {
+    background-color: #F5F4F1;
+    color: #1B1A17;
+    font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { border-color: #E8E5E0; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #DEDAD3; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #C7C2B8; }
+}
+
+/* Landing page animations */
+@keyframes lg-cta-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 214, 143, 0.35); }
+  55%       { box-shadow: 0 0 0 16px rgba(0, 214, 143, 0); }
+}
+@keyframes lg-node-halo {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 0.04; }
+}
+.lg-fade {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lg-fade.lg-visible          { opacity: 1 !important; transform: translateY(0) !important; }
+.lg-cta-pulse                { animation: lg-cta-pulse 2.8s ease-in-out infinite; }
+.lg-halo-1                   { animation: lg-node-halo 2.2s ease-in-out 0.0s infinite; }
+.lg-halo-2                   { animation: lg-node-halo 2.2s ease-in-out 0.4s infinite; }
+.lg-halo-3                   { animation: lg-node-halo 2.2s ease-in-out 0.8s infinite; }
+.lg-halo-4                   { animation: lg-node-halo 2.2s ease-in-out 1.2s infinite; }
+.lg-halo-5                   { animation: lg-node-halo 2.2s ease-in-out 1.6s infinite; }
+.font-display                { font-family: 'Space Grotesk', 'DM Sans', sans-serif; }
+
+@keyframes brand-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@layer utilities {
+  .text-gradient-accent {
+    background: linear-gradient(135deg, #0D9488, #00A8FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-brand-gradient {
+    background: linear-gradient(135deg, #FF4C1D, #C4006A, #9B0063);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .brand-gradient-bg {
+    background: linear-gradient(135deg, #FF4C1D, #9B0063);
+  }
+  .brand-gradient-border {
+    position: relative;
+  }
+  .brand-gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, #FF4C1D, #9B0063);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .glow-accent  { box-shadow: 0 0 20px rgba(13, 148, 136, 0.18); }
+  .glow-brand   { box-shadow: 0 0 24px rgba(255, 76, 29, 0.18); }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  .brand-shimmer {
+    background: linear-gradient(270deg, #FF4C1D, #C4006A, #9B0063, #FF4C1D);
+    background-size: 300% 300%;
+    animation: brand-shimmer 4s ease infinite;
+  }
+
+  /* Soft, warm shadows for the light card system — replaces the border-only
+     depth cues the dark theme used, since flat colour alone doesn't read as
+     "elevated" on a light background. */
+  .shadow-soft    { box-shadow: 0 1px 2px rgba(23, 22, 19, 0.04), 0 10px 28px -14px rgba(23, 22, 19, 0.12); }
+  .shadow-soft-lg { box-shadow: 0 2px 6px rgba(23, 22, 19, 0.05), 0 20px 44px -18px rgba(23, 22, 19, 0.18); }
+
+  .hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -10px rgba(23, 22, 19, 0.18);
+    border-color: #D8D4CC;
+  }
+}
