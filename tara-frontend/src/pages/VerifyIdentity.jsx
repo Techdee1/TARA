@@ -8,6 +8,18 @@ import { useVerifyIdentity } from '@/hooks/useIdentities'
 import { formatNaira } from '@/utils/formatters'
 import { useAmountsStore } from '@/store/amountsStore'
 import { taraAudio } from '@/lib/taraAudio'
+import { normalizeQoreIdResponse } from '@/utils/qoreid'
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+
+function SummaryRow({ label, value, mono }) {
+  if (!value) return null
+  return (
+    <div>
+      <dt className="text-[10px] text-[#8A8580] uppercase tracking-wider mb-0.5">{label}</dt>
+      <dd className={`text-sm text-[#1B1A17] font-medium ${mono ? 'font-mono' : ''}`}>{value}</dd>
+    </div>
+  )
+}
 
 const EMPTY_FORM = {
   full_name: '',
@@ -44,7 +56,7 @@ export default function VerifyIdentity() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
   const [result, setResult] = useState(null)
-  const [showRaw, setShowRaw] = useState(true)
+  const [showRaw, setShowRaw] = useState(false)
   const verifyMutation = useVerifyIdentity()
   const setAmount = useAmountsStore((s) => s.setAmount)
 
@@ -200,12 +212,62 @@ export default function VerifyIdentity() {
 
       {result && (
         <Card className="p-4 sm:p-5 mt-4">
-          {result.status === 'verified' ? (
+          {result.status === 'verified' ? (() => {
+            const summary = normalizeQoreIdResponse(result.qoreid_raw)
+            return (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <span className="text-green-600 text-sm font-medium">✓ Verified via QoreID</span>
                 <span className="text-xs text-[#8A8580] font-mono sm:ml-auto break-all">{result.identity_id}</span>
               </div>
+
+              {summary && (
+                <div className="rounded-xl border border-[#E8E5E0] bg-[#F8F7F5] p-4">
+                  <div className="flex items-center justify-between mb-3.5">
+                    <p className="text-xs uppercase tracking-wider font-semibold text-[#8A8580]">Verification Summary</p>
+                    {summary.matchLabel && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#0D9488]/10 text-[#0D9488]">
+                        {summary.matchLabel}
+                      </span>
+                    )}
+                  </div>
+
+                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                    <SummaryRow label="Full Name" value={summary.fullName} />
+                    <SummaryRow label="ID Type" value={summary.idType} />
+                    <SummaryRow label="ID Number" value={summary.idNumber} mono />
+                    <SummaryRow label="Phone" value={summary.phone} />
+                    <SummaryRow label="Gender" value={summary.gender} />
+                    <SummaryRow label="Date of Birth" value={summary.dob} />
+                    {summary.confidence != null && (
+                      <SummaryRow label="Confidence" value={`${Math.round(summary.confidence * 100)}%`} />
+                    )}
+                  </dl>
+
+                  {summary.fieldMatches && summary.fieldMatches.length > 0 && (
+                    <div className="mt-3.5 pt-3.5 border-t border-[#E8E5E0] flex flex-wrap gap-1.5">
+                      {summary.fieldMatches.map(({ field, matched }) => (
+                        <span
+                          key={field}
+                          className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            matched ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'
+                          }`}
+                        >
+                          {matched ? <CheckIcon className="w-2.5 h-2.5" /> : <XMarkIcon className="w-2.5 h-2.5" />}
+                          {field}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {summary.isFallback && (
+                    <p className="mt-3.5 pt-3.5 border-t border-[#E8E5E0] text-[11px] text-amber-700 leading-relaxed">
+                      This used TARA&apos;s offline verification stub, not a live QoreID lookup
+                      {summary.fallbackReason ? ` — ${summary.fallbackReason}` : '.'}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {form.requested_amount_ngn.trim() && !Number.isNaN(Number(form.requested_amount_ngn)) && (
                 <p className="text-sm text-[#6B6660]">
@@ -216,12 +278,12 @@ export default function VerifyIdentity() {
               <div>
                 <button
                   onClick={() => setShowRaw((v) => !v)}
-                  className="text-xs text-[#0D9488] hover:underline mb-2"
+                  className="text-xs text-[#8A8580] hover:text-[#0D9488] transition-colors"
                 >
-                  {showRaw ? 'Hide' : 'Show'} raw QoreID response
+                  {showRaw ? '− Hide' : '+ Show'} technical response (raw JSON)
                 </button>
                 {showRaw && (
-                  <pre className="bg-[#F5F4F1] border border-[#E8E5E0] rounded-md p-3 text-[11px] text-[#6B6660] font-mono overflow-x-auto whitespace-pre-wrap break-all">
+                  <pre className="mt-2 bg-[#F5F4F1] border border-[#E8E5E0] rounded-md p-3 text-[11px] text-[#6B6660] font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
                     {JSON.stringify(result.qoreid_raw, null, 2)}
                   </pre>
                 )}
@@ -239,7 +301,8 @@ export default function VerifyIdentity() {
                 </Button>
               </div>
             </div>
-          ) : (
+            )
+          })() : (
             <div className="flex flex-wrap items-center gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
               <span className="text-red-600 text-sm font-medium">
                 ✗ {result.status === 'rejected' ? 'Identity not verified' : 'Request failed'}
